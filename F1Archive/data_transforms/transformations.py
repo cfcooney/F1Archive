@@ -79,7 +79,7 @@ def qualy_differences(qualy_df, race_names):
         for n, race in enumerate(race_names):
             
             if 0 in df_tmp[race, 'Time'].values or 'DNF' in df_tmp[race, 'Time'].values:
-                break
+                continue
 
             df_tmp, diff = time_diff(df_tmp, race)
 
