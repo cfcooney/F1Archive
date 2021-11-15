@@ -5,7 +5,7 @@ import functools
 import operator
 pd.options.mode.chained_assignment = None  # default='warn'
 
-fcn = lambda x: round(x-60.0,3) if x > 10.0 else x # datetime conversion
+fcn = lambda x: round(x-60.0,3) if not  -15 < x < 15 else x # datetime conversion
 
 def datetime_2_time(series, format='%M:%S.%f'):
     """
@@ -21,6 +21,7 @@ def avg_datetime(series):
     """
     Calculates average time from a pd.Series of datetime objects
     """
+    print(series)
     dt_min = series.min()
  
     deltas = [x-dt_min for x in series]
@@ -40,16 +41,19 @@ def time_diff(df_tmp, race):
             differences (list) - + and - times for each driver
     """
     
-    df_tmp.loc[:, (race, 'Time')] = pd.to_datetime(df_tmp.loc[:, (race, 'Time')].copy(), format='%M:%S.%f').dt.time
+    
     difference = []
     
     try:
+        df_tmp.loc[:, (race, 'Time')] = pd.to_datetime(df_tmp.loc[:, (race, 'Time')].copy(), format='%M:%S.%f').dt.time
         t1 = datetime.combine(date.min, df_tmp[race, 'Time'].values[0])
         t2 = datetime.combine(date.min, df_tmp[race, 'Time'].values[1])
         a = t1 - t2
         b = t2 - t1
+        
         a = fcn(divmod(a.total_seconds(), 60)[1])
         b = fcn(divmod(b.total_seconds(), 60)[1])
+        
     
         difference.append(a)
         difference.append(b)
@@ -73,7 +77,8 @@ def qualy_differences(qualy_df, race_names):
         df_tmp = qualy_df.loc[qualy_df['Details','Car'] == make]
     
         for n, race in enumerate(race_names):
-            if 0 in df_tmp[race, 'Time'].values:
+            
+            if 0 in df_tmp[race, 'Time'].values or 'DNF' in df_tmp[race, 'Time'].values:
                 break
 
             df_tmp, diff = time_diff(df_tmp, race)
@@ -105,7 +110,7 @@ def qualy_relative_2_mean(q_df, race_names=None, threshold=-10):
         for i, t in enumerate(q_df_copy[race, 'Time'].values):
             
             # convert untimed types for further processing 
-            if type(t) !=str or t == 'DNC':
+            if type(t) !=str or t == 'DNC' or t == 'DNF' or t == 'DNS':
                 t = '00:00.0'
             try:
                 time = datetime.strptime(t, '%M:%S.%f')
@@ -117,7 +122,7 @@ def qualy_relative_2_mean(q_df, race_names=None, threshold=-10):
         q_datetime_df = q_df_copy[race, 'Time'] # times in a separate dataframe
 
         for ind in q_datetime_df.index:
-            if str(q_datetime_df[ind]) == '1900-01-01 00:00:00':
+            if str(q_datetime_df[ind]) == '1900-01-01 00:00:00' or q_datetime_df[ind] == 'DNF':
                 q_datetime_df.drop(axis=0, index=ind, inplace=True) # datetimes with zeros removed
 
         # calculate the mean qualifying time for race
@@ -158,9 +163,3 @@ def qualy_season_mean_df(df, race_names=None):
     new_df['Mean'] = new_df.drop(['Driver','Car'], axis=1).mean(axis=1)
 
     return new_df
-
-
-
-
-
-
