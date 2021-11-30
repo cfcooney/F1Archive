@@ -203,7 +203,7 @@ def plot_constructors(df, figsize=(9,5), colors=None, year='X', save=False, save
 
     ax.set(xlabel='Team', ylabel='Points')
     ax.set_title(f'Constructors championship points for {year} season')
-    ax.set(xticks=range(0, 9), xticklabels=[name[:3] for name in df['Team']])
+    ax.set(xticks=range(0, df['Team'].shape[0]), xticklabels=[name[:3] for name in df['Team']])
     
     ax.get_legend().remove()
     for bar, color in zip(ax.patches, palette):
