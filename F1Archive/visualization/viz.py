@@ -149,7 +149,7 @@ def plot_per_max(df, figsize=(9,5), colors=None, year='X', save=False, savefile=
 
     ax.set(xlabel='Team', ylabel='Points as percentage of maximum')
     ax.set_title(f'Points as percentage of maximum for {year} season')
-    ax.set(xticks=range(0, , df['Team'].shape[0]), xticklabels=[name[:3] for name in df['Team']])
+    ax.set(xticks=range(0, df['Team'].shape[0]), xticklabels=[name[:3] for name in df['Team']])
     
     ax.get_legend().remove()
     for bar, color in zip(ax.patches, palette):
