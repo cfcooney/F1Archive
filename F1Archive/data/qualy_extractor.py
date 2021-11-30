@@ -13,6 +13,12 @@ log_format = '%(asctime)s | %(levelname)s: %(message)s'
 console_handler_Q.setFormatter(logging.Formatter(log_format))
 logger.addHandler(console_handler_Q)
 
+def get_driver_team_list(df: pd.DataFrame):
+    driver_team_list = []
+    for n, row in df.iterrows():
+        driver_team_list.append(row['Details']['Driver'] + '_' + row['Details']['Car'])
+    return driver_team_list
+
 
 class QualyExtractor(DataExtractor):
     """
@@ -60,7 +66,7 @@ class QualyExtractor(DataExtractor):
        for those years under consideration.
        """
        for yr, urls in self.qualy_urls.items():
-            qualy_dict = dict(Details=["Driver", "Car"])
+            qualy_dict = dict(Details=["Driver", "Car","Driver No"])
             for race in urls:
                 if race.split('/')[6] not in qualy_dict.keys():
                     qualy_dict[race.split('/')[6]] = ["Position", "Time", "Team-mate"]
@@ -77,7 +83,7 @@ class QualyExtractor(DataExtractor):
             self.qualy_df()
         
         for yr, urls in self.qualy_urls.items():
-            col_num = 2
+            col_num = 3
             results_df = self.qualy_results[yr]
             
             logger.info(f"Extracting qualifying results for {yr} season")
@@ -89,27 +95,48 @@ class QualyExtractor(DataExtractor):
                 
                 df = self.data_to_table(race, logging=logging)
                 df.drop_duplicates(subset='Pos', keep='first', inplace=True) # remove duplicates from F1 site
-               
+                
+                #display(df.No)
                 if n == 0:
                     results_df["Details","Car"] = df["Car"]
                     results_df["Details", "Driver"] = df["Driver"]
+                    results_df["Details", 'Driver No'] = df.index
                     results_df.index = df.index
-              
+                
+                #display(results_df)
                 # add previously unseen drivers at each race
                 for ind in df.index.difference(results_df.index):
-                    results_df.loc[ind] = [df['Driver'].loc[ind],df['Car'].loc[ind],*placeholder] #PROBLEM
+        
+                    results_df.loc[ind] = [df['Driver'].loc[ind],df['Car'].loc[ind],ind,*placeholder] #PROBLEM
+       
+                for n, row in df.iterrows():
+                    driver_team = row['Driver'] + '_' + row['Car']
+                    if driver_team not in get_driver_team_list(results_df):
+                        results_df.loc[1000+n] = [row['Driver'],row['Car'],n,*placeholder]
                 
+
                 if int(yr) >= 2006:
                     df['Time'] = self.get_final_qualy(df)
                 df['Time'] = df['Time'].fillna(0)
-                
+
                 for ind in df.index:
                     pos = df['Pos'].where(df.index == ind).dropna().values[0]
                     time = df['Time'].where(df.index == ind).dropna().values[0]
-                    
-                    results_df.at[ind, (f"{results_df.columns[col_num][0]}",'Position')] = pos
-                    results_df.at[ind, (f"{results_df.columns[col_num][0]}", 'Time', )] = time
+
+                    if df['Car'].loc[ind] == results_df['Details']['Car'].loc[ind]:
+                        
+                        results_df.at[ind, (f"{results_df.columns[col_num][0]}",'Position')] = pos
+                        results_df.at[ind, (f"{results_df.columns[col_num][0]}", 'Time', )] = time
+                    else:
+                        for i in results_df.index:
+                            if results_df['Details']['Driver No'].loc[i] == ind and results_df['Details']['Driver No'].loc[i] != i:
+                               
+                                results_df.at[i, (f"{results_df.columns[col_num][0]}",'Position')] = pos
+                                results_df.at[i, (f"{results_df.columns[col_num][0]}", 'Time', )] = time
+        
+
                 col_num += 3
+            display(results_df)
             #####Format the dataframe with a few lines#####
             results_df.sort_index(inplace=True)
             #results_df.fillna(0, inplace=True)   
