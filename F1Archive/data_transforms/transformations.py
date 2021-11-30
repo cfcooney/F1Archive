@@ -3,6 +3,7 @@ import numpy as np
 from datetime import datetime, date
 import functools
 import operator
+import itertools
 pd.options.mode.chained_assignment = None  # default='warn'
 
 fcn = lambda x: round(x-60.0,3) if not  -15 < x < 15 else x # datetime conversion
@@ -17,11 +18,31 @@ def datetime_2_time(series, format='%M:%S.%f'):
     tme = dt.time() # convert to datetime.time
     return tme
 
+def try_get_diff(comb, df, race):
+    difference = []
+    df_tmp1 = df.copy()
+    df_tmp1.loc[:, (race, 'Time')] = pd.to_datetime(df.loc[:,
+                                                    (race, 'Time')].copy(),
+                                                    format='%M:%S.%f').dt.time
+    t1 = datetime.combine(date.min, df_tmp1[race, 'Time'].values[comb[0]])
+
+    t2 = datetime.combine(date.min, df_tmp1[race, 'Time'].values[comb[1]])
+    a = t1 - t2
+    b = t2 - t1
+
+    a = fcn(divmod(a.total_seconds(), 60)[1])
+    b = fcn(divmod(b.total_seconds(), 60)[1])
+
+
+    difference.append(a)
+    difference.append(b)
+    return difference
+
 def avg_datetime(series):
     """
     Calculates average time from a pd.Series of datetime objects
     """
-    print(series)
+    #print(series)
     dt_min = series.min()
  
     deltas = [x-dt_min for x in series]
@@ -31,6 +52,40 @@ def avg_datetime(series):
     
     return tme
 
+
+# def time_diff(df_tmp, race):
+#     """
+#     Function for extracting differences between team-mates' qualifying times.
+#     Input: df_tmp (pd.DataFrame) - Temporary dataframe containing team-mates results
+#            race (str) - name of race for which times are being compared
+#     Output: df_tmp (pd.DataFrame) - Temporary dataframe with differences added
+#             differences (list) - + and - times for each driver
+#     """
+    
+    
+#     difference = []
+    
+#     try:
+#         df_tmp.loc[:, (race, 'Time')] = pd.to_datetime(df_tmp.loc[:, (race, 'Time')].copy(), format='%M:%S.%f').dt.time
+#         t1 = datetime.combine(date.min, df_tmp[race, 'Time'].values[0])
+#         t2 = datetime.combine(date.min, df_tmp[race, 'Time'].values[1])
+#         a = t1 - t2
+#         b = t2 - t1
+        
+#         a = fcn(divmod(a.total_seconds(), 60)[1])
+#         b = fcn(divmod(b.total_seconds(), 60)[1])
+        
+    
+#         difference.append(a)
+#         difference.append(b)
+#     except:
+#         difference.append(0)
+#         difference.append(0)
+    
+#     for i, n in enumerate(df_tmp.index):
+#         df_tmp.at[n, (race, 'Team-mate')] =  difference[i]
+    
+#     return df_tmp, difference
 
 def time_diff(df_tmp, race):
     """
@@ -43,27 +98,28 @@ def time_diff(df_tmp, race):
     
     
     difference = []
-    
-    try:
-        df_tmp.loc[:, (race, 'Time')] = pd.to_datetime(df_tmp.loc[:, (race, 'Time')].copy(), format='%M:%S.%f').dt.time
-        t1 = datetime.combine(date.min, df_tmp[race, 'Time'].values[0])
-        t2 = datetime.combine(date.min, df_tmp[race, 'Time'].values[1])
-        a = t1 - t2
-        b = t2 - t1
-        
-        a = fcn(divmod(a.total_seconds(), 60)[1])
-        b = fcn(divmod(b.total_seconds(), 60)[1])
-        
-    
-        difference.append(a)
-        difference.append(b)
-    except:
-        difference.append(0)
-        difference.append(0)
-    
+    i_list = [i for i in range(len(df_tmp[race, 'Time'].values))]
+    combinations=list(itertools.combinations(i_list, r=2)) 
+ 
+    for c in combinations:
+        try:
+            difference = try_get_diff(c, df_tmp.copy(), race)
+        except Exception as error:
+            #print(error)
+            pass
+
+    if not difference:
+        difference = [0.0, 0.0]
+
+    flag = 0
     for i, n in enumerate(df_tmp.index):
-        df_tmp.at[n, (race, 'Team-mate')] =  difference[i]
-    
+
+        if not pd.isna(df_tmp.at[n, (race, 'Time')]):
+            
+            df_tmp.at[n, (race, 'Team-mate')] = difference[i-flag]
+        else:
+            flag += 1
+            
     return df_tmp, difference
 
 def qualy_differences(qualy_df, race_names):
@@ -73,23 +129,24 @@ def qualy_differences(qualy_df, race_names):
          : race_names (list) list of race names for given year
     Output: df (pd.DataFrame) - QualyExtractor DataFrame with relative times added. 
     """
+    
     for make in qualy_df['Details','Car'].unique():
         df_tmp = qualy_df.loc[qualy_df['Details','Car'] == make]
-    
+        
         for n, race in enumerate(race_names):
             
-            if 0 in df_tmp[race, 'Time'].values or 'DNF' in df_tmp[race, 'Time'].values:
-                continue
+#             if 0 in df_tmp[race, 'Time'].values or 'DNF' in df_tmp[race, 'Time'].values:
+#                 continue
 
             df_tmp, diff = time_diff(df_tmp, race)
-
+           
             if diff == [0, 0]:
                 print(f"No comparison available for Team: {make} at Race: {race}")
             
-            for ind in df_tmp.index:
-    
-                gap = df_tmp[race, 'Team-mate'].where(df_tmp.index == ind).dropna().values[0]
+            for n, ind in enumerate(df_tmp.index):
             
+                gap = df_tmp[race, 'Team-mate'].where(df_tmp.index == ind).values[n]
+
                 qualy_df.at[ind, (race, 'Team-mate')] = float(gap)            
                 
     qualy_df.fillna(0, inplace=True)   
